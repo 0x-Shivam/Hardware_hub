@@ -1,44 +1,49 @@
 "use client";
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'model-viewer': ModelViewerElement;
-    }
-  }
-}
-
-interface ModelViewerElement extends React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> {
-  src?: string;
-  alt?: string;
-  'camera-controls'?: boolean;
-  'auto-rotate'?: boolean;
-  'shadow-intensity'?: string;
-}
-
-// ...existing code...
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function HardwarePage() {
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d');
+  const [hardware, setHardware] = useState<any>(null);
 
-  // Safely import the web component only on the client side
   useEffect(() => {
+    // 1. Load the 3D viewer
     import('@google/model-viewer').catch(console.error);
+
+    // 2. Fetch the database data
+    const fetchHardware = async () => {
+      const { data, error } = await supabase
+        .from('hardware')
+        .select('name, specs, model_url, categories(name)')
+        .eq('id', 1)
+        .single();
+        
+      // Log any database errors to the browser console
+      if (error) {
+        console.error("Supabase Error:", error);
+      }
+      
+      setHardware(data);
+    };
+    
+    fetchHardware();
   }, []);
 
+  // Show a loading screen while Supabase fetches
+  if (!hardware) return <div className="min-h-screen p-10 bg-[#0a0b10] text-white">Loading database... (Check your browser console if this hangs)</div>;
+
   return (
-    <main className="min-h-screen p-10 flex flex-col gap-10">
-      
+    <main className="min-h-screen p-10 flex flex-col gap-10 bg-[#0a0b10] text-white">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-7xl mx-auto w-full">
         
         {/* LEFT COLUMN: Media & Controls */}
         <div className="flex flex-col gap-6">
-          <div className="glass-panel w-full aspect-[4/3] flex items-center justify-center relative overflow-hidden shadow-2xl">
+          <div className="glass-panel w-full aspect-[4/3] flex items-center justify-center relative overflow-hidden shadow-2xl bg-[#13151c] bg-opacity-60 border border-gray-700 rounded-2xl">
             
             {viewMode === '3d' ? (
               <model-viewer
-                src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+                src={hardware.model_url}
                 alt="3D Component"
                 camera-controls
                 auto-rotate
@@ -46,24 +51,22 @@ export default function HardwarePage() {
                 style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
               ></model-viewer>
             ) : (
-              <img 
-                src="https://upload.wikimedia.org/wikipedia/commons/1/1d/Jessica_Meir_official_portrait_in_an_EMU_%28B%26W%29.jpg" 
-                alt="2D Component" 
-                className="w-3/4 h-3/4 object-contain opacity-80"
-              />
+              <div className="flex items-center justify-center w-full h-full text-gray-500 font-mono">
+                [ 2D Image Placeholder ]
+              </div>
             )}
           </div>
 
-          <div className="flex gap-4 glass-panel w-fit p-2 rounded-full">
+          <div className="flex gap-4 glass-panel w-fit p-2 rounded-full border border-gray-700">
             <button 
               onClick={() => setViewMode('2d')}
-              className={`px-6 py-2 rounded-full font-medium transition-all ${viewMode === '2d' ? 'glow-active' : 'text-gray-400'}`}
+              className={`px-6 py-2 rounded-full font-medium transition-all ${viewMode === '2d' ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'text-gray-400'}`}
             >
               2D Schematic
             </button>
             <button 
               onClick={() => setViewMode('3d')}
-              className={`px-6 py-2 rounded-full font-medium transition-all ${viewMode === '3d' ? 'glow-active' : 'text-gray-400'}`}
+              className={`px-6 py-2 rounded-full font-medium transition-all ${viewMode === '3d' ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'text-gray-400'}`}
             >
               3D Interactive
             </button>
@@ -73,33 +76,22 @@ export default function HardwarePage() {
         {/* RIGHT COLUMN: Info & Specs */}
         <div className="flex flex-col gap-8">
           <div>
-            <p className="text-blue-500 font-mono text-sm tracking-widest uppercase mb-2">Motherboard / System Board</p>
-            <h1 className="text-4xl font-bold tracking-tight text-white">HP EliteDesk Series</h1>
+            <p className="text-blue-500 font-mono text-sm tracking-widest uppercase mb-2">
+              {hardware.categories?.name || 'Uncategorized'}
+            </p>
+            <h1 className="text-4xl font-bold tracking-tight text-white">{hardware.name}</h1>
           </div>
 
-          <div className="glass-panel p-8">
+          <div className="glass-panel p-8 bg-[#13151c] bg-opacity-60 border border-gray-700 rounded-2xl">
             <h3 className="text-xl font-semibold mb-6 text-white border-b border-gray-700 pb-2">Technical Specifications</h3>
             <ul className="flex flex-col gap-4">
-              <li className="flex gap-4">
-                <span className="text-gray-400 min-w-[120px]">Form Factor</span>
-                <span className="font-mono text-gray-200">Proprietary SFF / Microtower</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="text-gray-400 min-w-[120px]">Socket</span>
-                <span className="font-mono text-gray-200">LGA 1151</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="text-gray-400 min-w-[120px]">Memory</span>
-                <span className="font-mono text-gray-200">DDR4 DIMM (4 Slots)</span>
-              </li>
+              {hardware.specs && Object.entries(hardware.specs).map(([key, value]) => (
+                <li key={key} className="flex gap-4">
+                  <span className="text-gray-400 min-w-[120px]">{key}</span>
+                  <span className="font-mono text-gray-200">{String(value)}</span>
+                </li>
+              ))}
             </ul>
-          </div>
-
-          <div className="glass-panel p-8 border-l-4 border-l-blue-500">
-            <h3 className="text-lg font-bold mb-3 text-white">Use Case & Troubleshooting</h3>
-            <p className="text-gray-400 leading-relaxed">
-              Designed specifically for enterprise environments requiring compact footprints. Common hardware troubleshooting on this board involves isolating the proprietary power supply connectors and verifying seating of the RAM modules if the system triggers beep codes upon boot.
-            </p>
           </div>
         </div>
 
