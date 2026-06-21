@@ -116,27 +116,28 @@ function LiquidCursor() {
   );
 }
 
-// main page 
-
+/ --- MAIN PAGE LAYOUT ---
 export default function LandingPage() {
-    return(
-        <main className="min-h-screen bg-[#070707] text-[#E5E5E5] font-sans selection:bg-[#E5E5E5] selection:text-[#070707] relative flex flex-col justify-between">
+  return (
+    <main className="min-h-screen bg-[#070707] text-[#E5E5E5] font-sans selection:bg-[ selection:text-[#070707] relative flex flex-col justify-between">
+      
+      {/* Our newly added liquid cursor effect */}
+      <LiquidCursor />
 
-            <LiquidCursor />
-
-            {/* Awwwards Style Film Grain / Noise Overlay */}
-
-            <div className="pointer-events-none fixed inset-0 z-40 h-full w-full opacity-[0.03]"
-
-            style={{ backgroundImage: 'url("data:image/svg+xml, %3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}
+      {/* Awwwards Style Film Grain / Noise Overlay */}
+      <div 
+        className="pointer-events-none fixed inset-0 z-40 h-full w-full opacity-[0.03]" 
+        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}
       ></div>
 
-
       {/* Top Editorial Nav */}
+      <nav className="flex justify-between items-center px-6 py-5 border-b border-[#222] relative z-10">
+        <div className="text-xs uppercase tracking-[0.3em] font-mono text-[#777]">System.Index</div>
+        <div className="flex gap-4">
+          <span className="w-2 h-2 rounded-full bg-[#E5E5E5] animate-pulse"></span>
+          <div className="text-xs uppercase tracking-[0.3em] font-mono text-[#E5E5E5]">Active</div>
+        </div>
+      </nav>
 
 
-        </main>
-    )
-
-}
-
+      {/* Massive Brutalist Hero */}
