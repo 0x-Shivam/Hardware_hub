@@ -12,7 +12,12 @@ function LiquidCursor() {
 
     const points = useRef(Array.from({ length: 35 }, () => { x: 0, y: 0 }));
 
-    const 
+    const mouse = useRef({ x: 0, y: 0 });
+    const hasMoved = useRef(false);
+
+    useEffect(() => {
+        const canvas 
+
 
 
 
