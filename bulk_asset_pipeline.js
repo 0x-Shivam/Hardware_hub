@@ -74,7 +74,7 @@ const productList = [
 ];
 
 // Your Sketchfab API Token (Get this from your Sketchfab account settings)
-const SKETCHFAB_API_TOKEN = "YOUR_SKETCHFAB_TOKEN_HERE";
+const SKETCHFAB_API_TOKEN = "";
 
 // 2. WIKIPEDIA 2D IMAGE FETCHER (No API Key Required)
 async function getWikipedia2DImage(hardwareName) {
@@ -101,36 +101,23 @@ async function getWikipedia2DImage(hardwareName) {
     }
 }
 
-// 3. SECURE FILE DOWNLOADER
-const downloadFile = (url, dest) => {
-  return new Promise((resolve, reject) => {
-    if (!url) {
-      resolve(); // Skip if no URL provided
-      return;
-    }
-
-    const file = fs.createWriteStream(dest);
-    https.get(url, (response) => {
-      // Handle redirects if necessary (Wikipedia sometimes does this)
-      if (response.statusCode === 301 || response.statusCode === 302) {
-        return downloadFile(response.headers.location, dest).then(resolve).catch(reject);
-      }
-      
-      if (response.statusCode !== 200) {
-        reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
-        return;
-      }
-      
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        resolve();
-      });
-    }).on('error', (err) => {
-      fs.unlink(dest, () => reject(err));
-    });
+// 3. SECURE FILE DOWNLOADER (UPDATED to fix empty images)
+async function downloadFile(url, dest) {
+  if (!url) return;
+  
+  // Wikipedia requires a User-Agent, otherwise it blocks the image download
+  const response = await fetch(url, {
+      headers: { 'User-Agent': 'HardwareIndexerBot/1.0 (https://example.com)' }
   });
-};
+
+  if (!response.ok) {
+      throw new Error(`Failed to download '${url}' (${response.status})`);
+  }
+  
+  // Convert the response to a buffer and save it
+  const buffer = await response.arrayBuffer();
+  fs.writeFileSync(dest, Buffer.from(buffer));
+}
 
 // 3.5 SKETCHFAB 3D MODEL FETCHER
 async function getSketchfab3DModel(query) {
