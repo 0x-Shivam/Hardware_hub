@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import https from 'https';
 
 // 1. YOUR MASTER LIST (250+ Components across all hardware domains)
 const productList = [
@@ -73,39 +72,41 @@ const productList = [
   "AM5 CPU Socket", "CPU Cooler Heatsink", "Noctua NF-A12x25 Fan", "Cherry MX Red Switch", "Cherry MX Blue Switch"
 ];
 
-// Your Sketchfab API Token (Get this from your Sketchfab account settings)
-const SKETCHFAB_API_TOKEN = "";
+// 2. YOUR API TOKENS
 
-// 2. WIKIPEDIA 2D IMAGE FETCHER (No API Key Required)
-async function getWikipedia2DImage(hardwareName) {
-    console.log(`   -> Searching Wikipedia for: ${hardwareName}...`);
-    const query = encodeURIComponent(hardwareName);
-    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${query}&prop=pageimages&format=json&pithumbsize=1000&origin=*`;
+
+// 3. GOOGLE IMAGES FETCHER (Best Way for Real Product Photos)
+async function getGoogleProductImage(hardwareName) {
+    console.log(`   -> Searching Google Images for: ${hardwareName}...`);
+    
+    // We add "hardware component" to the query to ensure we get the actual electronic part
+    const query = encodeURIComponent(`${hardwareName} hardware component`);
+    
+    // This targets the Google Custom Search API, filtering specifically for images
+    const searchUrl = `https://www.googleapis.com/customsearch/v1?q=${query}&cx=${GOOGLE_CX_ID}&key=${GOOGLE_API_KEY}&searchType=image&num=1`;
 
     try {
         const response = await fetch(searchUrl);
         const data = await response.json();
         
-        const pages = data.query.pages;
-        const pageId = Object.keys(pages)[0];
-        
-        if (pageId === "-1" || !pages[pageId].thumbnail) {
-            console.log(`   -> [WARNING] No 2D image found on Wikipedia for ${hardwareName}.`);
+        if (!data.items || data.items.length === 0) {
+            console.log(`   -> [WARNING] No Google Image found for ${hardwareName}.`);
             return null;
         }
-
-        return pages[pageId].thumbnail.source;
+        
+        // Return the direct image link of the #1 search result
+        return data.items[0].link;
     } catch (error) {
-        console.error(`   -> [ERROR] Wikipedia fetch failed:`, error);
+        console.error(`   -> [ERROR] Google Image fetch failed:`, error.message);
         return null;
     }
 }
 
-// 3. SECURE FILE DOWNLOADER (UPDATED to fix empty images)
+// 4. SECURE FILE DOWNLOADER
 async function downloadFile(url, dest) {
   if (!url) return;
   
-  // Wikipedia requires a User-Agent, otherwise it blocks the image download
+  // A User-Agent is crucial so image hosts don't block the automated download
   const response = await fetch(url, {
       headers: { 'User-Agent': 'HardwareIndexerBot/1.0 (https://example.com)' }
   });
@@ -114,16 +115,14 @@ async function downloadFile(url, dest) {
       throw new Error(`Failed to download '${url}' (${response.status})`);
   }
   
-  // Convert the response to a buffer and save it
   const buffer = await response.arrayBuffer();
   fs.writeFileSync(dest, Buffer.from(buffer));
 }
 
-// 3.5 SKETCHFAB 3D MODEL FETCHER
+// 5. SKETCHFAB 3D MODEL FETCHER
 async function getSketchfab3DModel(query) {
     console.log(`   -> Searching Sketchfab for 3D model: ${query}...`);
     try {
-        // A. Search for the model
         const searchRes = await fetch(`https://api.sketchfab.com/v3/search?q=${encodeURIComponent(query)}&type=models&downloadable=true`, {
             headers: { Authorization: `Token ${SKETCHFAB_API_TOKEN}` }
         });
@@ -136,13 +135,11 @@ async function getSketchfab3DModel(query) {
         
         const modelUid = searchData.results[0].uid;
 
-        // B. Get the download link for the first result
         const dlRes = await fetch(`https://api.sketchfab.com/v3/models/${modelUid}/download`, {
             headers: { Authorization: `Token ${SKETCHFAB_API_TOKEN}` }
         });
         const dlData = await dlRes.json();
         
-        // Sketchfab provides glTF models inside a .zip archive
         return dlData.gltf?.url || null;
     } catch (error) {
         console.error(`   -> [ERROR] Sketchfab fetch failed:`, error.message);
@@ -150,11 +147,10 @@ async function getSketchfab3DModel(query) {
     }
 }
 
-// 4. MAIN AUTOMATION PIPELINE
+// 6. MAIN AUTOMATION PIPELINE
 async function buildAssetLibrary() {
   const assetDir = './assets';
 
-  // Create the assets directory if it doesn't exist
   if (!fs.existsSync(assetDir)){
       fs.mkdirSync(assetDir);
   }
@@ -164,36 +160,60 @@ async function buildAssetLibrary() {
   for (const productName of productList) {
     console.log(`[Processing]: ${productName}`);
     
-    // Create a safe file name (e.g., "Arduino Uno" -> "arduino_uno")
     const safeId = productName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const path3D = path.join(assetDir, `${safeId}_3d.zip`); 
+
+    // Check if files already exist
+    const existingFiles = fs.readdirSync(assetDir);
+    const has2D = existingFiles.some(f => f.startsWith(`${safeId}_2d`));
+    const has3D = fs.existsSync(path3D);
+
+    if (has2D && has3D) {
+        console.log(`   -> [SKIPPED] Both 2D and 3D assets already exist.\n`);
+        continue;
+    }
 
     try {
-      // Step A: Auto-find 2D Image from Wikipedia
-      const image2DUrl = await getWikipedia2DImage(productName);
+      // Step A: Auto-find 2D Image from Google Images
+      let image2DUrl = null;
+      if (!has2D) {
+          image2DUrl = await getGoogleProductImage(productName);
+      } else {
+          console.log(`   -> [SKIPPED] 2D Image already exists locally.`);
+      }
       
       // Step B: Auto-find 3D Model from Sketchfab
-      const model3DUrl = await getSketchfab3DModel(productName);
+      let model3DUrl = null;
+      if (!has3D) {
+          model3DUrl = await getSketchfab3DModel(productName);
+      } else {
+          console.log(`   -> [SKIPPED] 3D Model already exists locally.`);
+      }
       
       // Step C: Set up file paths 
       const ext2D = image2DUrl ? (path.extname(new URL(image2DUrl).pathname) || '.jpg') : '.jpg';
-      const path2D = path.join(assetDir, `${safeId}_2d${ext2D}`);
       
-      // Note: Sketchfab API downloads are zipped archives containing the 3D files
-      const path3D = path.join(assetDir, `${safeId}_3d.zip`); 
+      // Prevent weird query strings from breaking file extensions
+      const cleanExt = ext2D.split('?')[0].substring(0, 5); 
+      const path2D = path.join(assetDir, `${safeId}_2d${cleanExt}`);
 
-      // Step D: Download 2D Image (If found)
+      // Step D: Download 2D Image
       if (image2DUrl) {
           console.log(`   -> Downloading 2D Image...`);
           await downloadFile(image2DUrl, path2D);
       }
 
-      // Step E: Download 3D Model (If found)
+      // Step E: Download 3D Model
       if (model3DUrl) {
           console.log(`   -> Downloading 3D Model (.zip)...`);
           await downloadFile(model3DUrl, path3D);
       }
 
       console.log(`[SUCCESS] Assets saved for ${productName}\n`);
+      
+      // Wait 1.5 seconds to respect Google and Sketchfab API limits
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
     } catch (error) {
       console.error(`[ERROR] Failed processing ${productName}:`, error.message, "\n");
     }

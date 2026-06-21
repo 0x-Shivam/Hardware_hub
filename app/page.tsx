@@ -16,9 +16,30 @@ function LiquidCursor() {
     const hasMoved = useRef(false);
 
     useEffect(() => {
-        const canvas 
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+
+
+        // Handle high-res displays and resizing
+        const updateSize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+        };
+
+        window.addEventListener('resize', updateSize);
+        updateSize();
+
+
+        //center starting point 
+        
 
 
 
 
-}
+
+
+};
