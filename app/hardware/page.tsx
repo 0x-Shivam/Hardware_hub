@@ -1,128 +1,98 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-// Using a mock Supabase client for demonstration
+// Mock Supabase client for local development
 const supabase = {
   from: (table: string) => ({
-    select: (query: string) => ({
-      eq: (column: string, val: any) => ({
-        single: async () => ({
-          data: {
-            name: "Arduino Uno",
-            specs: { "Microcontroller": "ATmega328P", "Clock Speed": "16 MHz", "Operating Voltage": "5V" },
-            model_url: "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
-            categories: { name: "Microcontrollers" },
-            description: "An open-source electronics platform based on easy-to-use hardware and software."
-          },
-          error: null
-        })
+    insert: (data: any) => ({
+      then: (callback: any) => callback({ data: null, error: null })
+    }),
+    storage: {
+      from: (bucket: string) => ({
+        upload: (name: string, file: any) => ({
+          then: (callback: any) => callback({ data: null, error: null })
+        }),
+        getPublicUrl: (name: string) => ({ data: { publicUrl: 'https://example.com/asset.glb' } })
       })
+    }
+  }),
+  storage: {
+    from: (bucket: string) => ({
+      upload: async (name: string, file: any) => ({ data: null, error: null }),
+      getPublicUrl: (name: string) => ({ data: { publicUrl: 'https://example.com/asset.glb' } })
     })
-  })
+  }
 };
 
-export default function HardwarePage() {
-  const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d');
-  const [hardware, setHardware] = useState<any>(null);
+export default function AdminPage() {
+  const [formData, setFormData] = useState({ name: '', specs: '' });
+  const [mode, setMode] = useState({ img: 'file', model: 'file' });
+  
+  // State for uploads
+  const [imgFile, setImgFile] = useState<File | null>(null);
+  const [imgUrl, setImgUrl] = useState('');
+  const [modelFile, setModelFile] = useState<File | null>(null);
+  const [modelUrl, setModelUrl] = useState('');
 
-  useEffect(() => {
-    // Inject model-viewer script via CDN
-    const script = document.createElement('script');
-    script.src = "https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js";
-    script.type = "module";
-    document.head.appendChild(script);
+  const handleUpload = async (file: File, bucket: string) => {
+    const fileName = `${Math.random()}-${file.name}`;
+    await supabase.storage.from(bucket).upload(fileName, file);
+    return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
+  };
 
-    const fetchHardware = async () => {
-      const { data, error } = await supabase
-        .from('hardware')
-        .select('name, specs, model_url, categories(name)')
-        .eq('id', 1)
-        .single();
-        
-      if (error) console.error("Supabase Error:", error);
-      setHardware(data);
-    };
-    
-    fetchHardware();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      let finalImg = imgUrl;
+      let finalModel = modelUrl;
 
-  if (!hardware) return <div className="min-h-screen bg-[#070707] text-[#777] p-20 font-mono">INITIALIZING_SYSTEM...</div>;
+      if (mode.img === 'file' && imgFile) finalImg = await handleUpload(imgFile, 'hardware-images');
+      if (mode.model === 'file' && modelFile) finalModel = await handleUpload(modelFile, 'hardware-models');
+
+      const { error } = await supabase.from('hardware').insert([{ 
+        name: formData.name, 
+        model_url: finalModel, 
+        image_2d_url: finalImg,
+        specs: JSON.parse(formData.specs || '{}')
+      }]);
+
+      if (error) throw error;
+      alert("Hardware component added successfully!");
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-[#070707] text-[#E5E5E5] font-sans selection:bg-[#E5E5E5] selection:text-[#070707]">
-      
-      <nav className="flex justify-between items-center px-6 py-5 border-b border-[#222]">
-        <a href="/" className="text-xs uppercase tracking-[0.3em] font-mono text-[#777] hover:text-[#E5E5E5]">Back.Archive</a>
-        <div className="text-xs uppercase tracking-[0.3em] font-mono text-[#E5E5E5]">Component.Detail</div>
-      </nav>
-
-      <div className="max-w-[90rem] mx-auto px-6 py-12 md:py-16 grid grid-cols-1 lg:grid-cols-[1.5fr,1fr] gap-16">
+    <main className="min-h-screen bg-[#070707] text-[#E5E5E5] p-10 font-mono">
+      <h1 className="text-3xl mb-10">ADMIN.ENTRY_POINT</h1>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 max-w-lg">
+        <input placeholder="Hardware Name" className="bg-[#111] p-3 border border-[#222]" onChange={(e) => setFormData({...formData, name: e.target.value})} />
         
-        {/* SELECTED MEDIA AREA */}
-        <section className="flex flex-col gap-6">
-          <div className="w-full aspect-[4/3] lg:aspect-[16/10] border border-[#222] bg-[#0a0a0a] relative flex items-center justify-center overflow-hidden">
-            {viewMode === '3d' ? (
-              React.createElement('model-viewer', {
-                src: hardware.model_url,
-                'camera-controls': true,
-                'auto-rotate': true,
-                'shadow-intensity': '1',
-                className: 'w-full h-full',
-                crossOrigin: 'anonymous',
-                style: { width: '100%', height: '100%' },
-                onError: (e: any) => console.error('Model Viewer Error:', e)
-              })
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-[#333] font-mono text-sm uppercase tracking-widest">
-                <svg className="w-16 h-16 mb-4 fill-[#222]" viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15l3.5-4.5 2.5 3.01L14.5 9l4.5 6H5z"/></svg>
-                [ 2D.SCHEMATIC ]
-              </div>
-            )}
-          </div>
+        {/* 2D Image Section */}
+        <div className="border border-[#222] p-4">
+          <label className="block mb-2 text-xs text-[#666]">2D Image ({mode.img})</label>
+          <select className="bg-[#111] mb-2 w-full" onChange={(e) => setMode({...mode, img: e.target.value})}>
+            <option value="file">Upload File</option>
+            <option value="url">Provide URL</option>
+          </select>
+          {mode.img === 'file' ? <input type="file" onChange={(e) => e.target.files && setImgFile(e.target.files[0])}/> : <input placeholder="Paste Image URL" className="bg-[#111] w-full" onChange={(e) => setImgUrl(e.target.value)}/>}
+        </div>
 
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setViewMode('2d')}
-              className={`flex-1 py-4 border font-mono text-xs uppercase tracking-[0.2em] transition-all ${viewMode === '2d' ? 'bg-[#E5E5E5] text-[#070707]' : 'border-[#222] text-[#777] hover:border-[#E5E5E5]'}`}
-            >
-              2D View
-            </button>
-            <button 
-              onClick={() => setViewMode('3d')}
-              className={`flex-1 py-4 border font-mono text-xs uppercase tracking-[0.2em] transition-all ${viewMode === '3d' ? 'bg-[#E5E5E5] text-[#070707]' : 'border-[#222] text-[#777] hover:border-[#E5E5E5]'}`}
-            >
-              3D Model
-            </button>
-          </div>
-        </section>
+        {/* 3D Model Section */}
+        <div className="border border-[#222] p-4">
+          <label className="block mb-2 text-xs text-[#666]">3D Model ({mode.model})</label>
+          <select className="bg-[#111] mb-2 w-full" onChange={(e) => setMode({...mode, model: e.target.value})}>
+            <option value="file">Upload File</option>
+            <option value="url">Provide URL</option>
+          </select>
+          {mode.model === 'file' ? <input type="file" onChange={(e) => e.target.files && setModelFile(e.target.files[0])}/> : <input placeholder="Paste Model URL" className="bg-[#111] w-full" onChange={(e) => setModelUrl(e.target.value)}/>}
+        </div>
 
-        {/* INFO SECTION */}
-        <section className="flex flex-col gap-12">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#555] mb-4">{hardware.categories?.name || 'Hardware'}</p>
-            <h1 className="text-5xl md:text-6xl font-bold uppercase tracking-tighter leading-none">{hardware.name}</h1>
-          </div>
-
-          <div className="specs-container flex flex-col gap-6 relative pl-6 border-l border-[#222]">
-            {hardware.specs && Object.entries(hardware.specs).map(([key, value]) => (
-              <div key={key} className="relative flex items-center gap-6">
-                <span className="absolute -left-[25px] w-4 h-[1px] bg-[#222]"></span>
-                <span className="text-[#777] text-sm font-medium uppercase tracking-wide min-w-[150px]">{key}</span>
-                <span className="text-[#E5E5E5] font-mono text-sm">{String(value)}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="p-8 border border-[#222] bg-[#0a0a0a]">
-            <h3 className="text-xs uppercase tracking-[0.2em] text-[#555] mb-4">Description</h3>
-            <p className="text-[#888] text-sm leading-relaxed uppercase tracking-wide">
-              {hardware.description || "No detailed technical description provided for this specific component entry."}
-            </p>
-          </div>
-        </section>
-
-      </div>
+        <textarea placeholder='Specs JSON' className="bg-[#111] p-3 border border-[#222] h-24" onChange={(e) => setFormData({...formData, specs: e.target.value})} />
+        <button type="submit" className="bg-[#E5E5E5] text-[#070707] py-3 font-bold uppercase">Commit to Database</button>
+      </form>
     </main>
   );
 }

@@ -25,7 +25,7 @@ const supabase = {
       getPublicUrl: (name: string) => ({ data: { publicUrl: 'https://example.com/image.jpg' } })
     })
   }
-};
+}; 
 
 export default function AdminPage() {
   const [formData, setFormData] = useState({ name: '', model_url: '', specs: '' });
