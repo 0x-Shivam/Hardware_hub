@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Using a mock Supabase client for demonstration
 const supabase = {
@@ -63,17 +63,16 @@ export default function HardwarePage() {
         <section className="flex flex-col gap-6">
           <div className="w-full aspect-[4/3] lg:aspect-[16/10] border border-[#222] bg-[#0a0a0a] relative flex items-center justify-center overflow-hidden">
             {viewMode === '3d' ? (
-              // @ts-ignore
-              <model-viewer
-                src={hardware.model_url}
-                camera-controls
-                auto-rotate
-                shadow-intensity="1"
-                className="w-full h-full"
-                crossOrigin="anonymous"
-                style={{ width: '100%', height: '100%' }}
-                onError={(e: any) => console.error("Model Viewer Error:", e)}
-              > </model-viewer>
+              React.createElement('model-viewer', {
+                src: hardware.model_url,
+                'camera-controls': true,
+                'auto-rotate': true,
+                'shadow-intensity': '1',
+                className: 'w-full h-full',
+                crossOrigin: 'anonymous',
+                style: { width: '100%', height: '100%' },
+                onError: (e: any) => console.error('Model Viewer Error:', e)
+              })
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-[#333] font-mono text-sm uppercase tracking-widest">
                 <svg className="w-16 h-16 mb-4 fill-[#222]" viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15l3.5-4.5 2.5 3.01L14.5 9l4.5 6H5z"/></svg>
