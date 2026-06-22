@@ -53,7 +53,7 @@ export default function AdminPage() {
       const { error } = await supabase.from('hardware').insert([{ 
         name: formData.name, 
         model_url: finalModel, 
-        image_2d_url: finalImg,
+        image_2d_url: falImg,
         specs: JSON.parse(formData.specs || '{}')
       }]);
 
